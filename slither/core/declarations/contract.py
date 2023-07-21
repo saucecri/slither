@@ -1039,6 +1039,27 @@ class Contract(SourceMapping):  # pylint: disable=too-many-public-methods
             modif_summaries,
         )
 
+    def get_summary_2(self, include_shadowed=True) -> Tuple[str, List[str], List[str], List, List]:
+        """Return the function summary
+
+        :param include_shadowed: boolean to indicate if shadowed functions should be included (default True)
+        Returns:
+            (str, list, list, list, list): (name, inheritance, variables, fuction summaries, modifier summaries)
+        """
+        func_summaries = [
+            f.get_summary_2() for f in self.functions if (not f.is_shadowed or include_shadowed)
+        ]
+        modif_summaries = [
+            f.get_summary() for f in self.modifiers if (not f.is_shadowed or include_shadowed)
+        ]
+        return (
+            self.name,
+            [str(x) for x in self.inheritance],
+            [str(x) for x in self.variables],
+            func_summaries,
+            modif_summaries
+        )
+    
     def is_signature_only(self) -> bool:
         """Detect if the contract has only abstract functions
 

@@ -1,3 +1,4 @@
+from slither.core.declarations import FunctionContract, Function
 import collections
 import re
 
@@ -32,42 +33,6 @@ def is_public(func): # TODO rename?
     return (not func.is_shadowed or (func.is_shadowed and func.is_constructor)) and \
            func.visibility in ['public', 'external']
 
-def get_reachable_functions_recursively(contract, function, results, reachable_func, list_of_functions):
-    """
-    From a Slither function object and a function name, generates the complete set of recursive reachable functions.
-    """ 
-
-    # For each function in the contract
-    for local_function in contract.functions:
-        counter = 0
-        last_match = 0
-        # For each reachable function in the current function
-        for reachable in local_function.reachable_from_functions:
-            counter = counter + 1
-            # Let's check if the current function we are analyzing is reachable 
-            if reachable == function:
-
-                # If it is reachable and not already saved, we save it in reachable_func[function.full_name]
-
-                if function.full_name not in reachable_func:
-                    last_match = counter
-                    reachable_func[function.full_name] = [local_function.full_name]
-                    list_of_functions.append(function.solidity_signature)
-                    list_of_functions.append(local_function.solidity_signature)
-
-                else:
-                    # if it is reachable and we already have something saved there, we save it in reachable_func[local_function.full_name] as a nested dict
-                    #print(f"SOYELELSE {reachable_func[function.full_name]}, {local_function.solidity_signature} ")
-                    reachable_func[function.full_name].append(local_function.full_name)
-                    list_of_functions.append(local_function.solidity_signature)
-
-
-                results.append(reachable_func)
-
-    list_of_functions = list(set(list_of_functions))
-
-    return results, list_of_functions
-
 def check_writing_assembly(function):
     """
     It checks if the Solidity function is writing a memory slot using assembly
@@ -101,35 +66,243 @@ def check_writing_assembly(function):
     return results 
 
 
-def build_recursive_dict(reachable_func):
+def build_json_from_reachable(reachable_func):
     """
-        It generates a recursive nested dict from the result of the get_reachable_functions_recursively function.
+        It generates a JSON from the result of the get_reachable_functions_recursively function.
     """
-    print(f"type(reachable_func) {type(reachable_func)}")
+    #print(f"type(reachable_func) {type(reachable_func)}")
 
     nested_dict_reachable = reachable_func.copy()
     counter = 0
     list_of_keys_to_delete = []
     for list_of_reachable in reachable_func.values():
-                            
-        dict_key = list(reachable_func)[counter]
-        for element in list_of_reachable:
-                                
-            if element in reachable_func.keys():
-                
-                # This handles the case when a function call the same function with `super`
-                if element == dict_key:
-                    break
+        
+        try:
+            dict_key = list(reachable_func)[counter]
+        
+            for element in list_of_reachable:
 
-                local_dict = {element: nested_dict_reachable[element]}
-                index = list_of_reachable.index(element)
-                nested_dict_reachable[dict_key][index] = local_dict
-                list_of_keys_to_delete.append(element)
-                counter = counter + 1    
-
-    list_of_keys_to_delete = list(dict.fromkeys(list_of_keys_to_delete))
+                if element in reachable_func.keys():
                     
-    for elem in list_of_keys_to_delete:
-        del nested_dict_reachable[elem]
+                    # This handles the case when a function call the same function with `super`
+                    if element == dict_key:
+                        break
 
-    return nested_dict_reachable    
+                    local_dict = {element: nested_dict_reachable[element]}
+
+                    index = list_of_reachable.index(element)
+                    nested_dict_reachable[dict_key][index] = local_dict
+                    list_of_keys_to_delete.append(element)
+                    counter = counter + 1    
+
+            list_of_keys_to_delete = list(dict.fromkeys(list_of_keys_to_delete))
+                    
+            for elem in list_of_keys_to_delete:
+                del nested_dict_reachable[elem]
+            print(f"nested_dict_reachable {nested_dict_reachable}")
+            return nested_dict_reachable 
+        
+        except IndexError:
+            print(f"err_nested_dict_reachable {nested_dict_reachable}, reachable_func")
+            #print(f"{reachable_func}[counter] does not exist")
+            return nested_dict_reachable
+
+
+
+def build_recursive_dict(reachable_func):
+    """
+        It generates a recursive nested dict from the result of the get_reachable_functions_recursively function.
+    """
+    #print(f"type(reachable_func) {type(reachable_func)}")
+
+    nested_dict_reachable = reachable_func.copy()
+    counter = 0
+    list_of_keys_to_delete = []
+    for list_of_reachable in reachable_func.values():
+        
+        try:
+            dict_key = list(reachable_func)[counter]
+        
+            for element in list_of_reachable:
+                                
+                if element in reachable_func.keys():
+                    
+                    # This handles the case when a function call the same function with `super`
+                    if element == dict_key:
+                        break
+
+                    local_dict = {element: nested_dict_reachable[element]}
+                    index = list_of_reachable.index(element)
+                    nested_dict_reachable[dict_key][index] = local_dict
+                    list_of_keys_to_delete.append(element)
+                    counter = counter + 1    
+
+            list_of_keys_to_delete = list(dict.fromkeys(list_of_keys_to_delete))
+                    
+            for elem in list_of_keys_to_delete:
+                del nested_dict_reachable[elem]
+            
+            return nested_dict_reachable 
+        
+        except IndexError:
+            #print(f"{reachable_func}[counter] does not exist")
+            return nested_dict_reachable            
+
+"""
+def get_call_functions_recursively(list_of_function_contract):
+
+    #From a Slither function contract object, generates the complete set of recursive reachable calls (internal,library,highlevel,lowlevel, solidity).
+
+    #nested_dict_reachable = reachable_func.copy()
+    counter = 0
+    results = []
+    list_of_keys_to_delete = []
+    
+    for function_contract in list_of_function_contract:
+
+    # For each call in list_of_function_contract (either internal, library, high/low level, solidity call) we just instantiate the function, and we get all of its data via all_high_level_calls(), all_low_level_calls(), all_internal_calls(), all_solidity_calls(), all_library_calls() 
+        #low_level, high_level, internal, library = function_contract.get_all_calls()
+        #for call in low_level:
+        #    results.append((call, LowLevelCallType))
+        #for call in high_level:
+        #    results.append((call, HighLevelCallType))
+        #for call in internal:
+        #    results.append((call, InternalCallType))
+        #for call in library:
+        #    results.append((call, LibraryCallType))
+
+        print(f"target_2 {results}")
+    #print(f"call_functions {results}")
+        return 
+    # If it is reachable and not already saved, we save it in reachable_func[function.full_name]
+"""
+
+
+def get_all_calls(alpha_function):
+    """
+        Return the function summary
+    Returns:
+        (str, str, str, list(str), list(str), listr(str), list(str), list(str);
+        contract_name, name, visibility, modifiers, vars read, vars written, internal_calls, external_calls_as_expressions
+    """
+    if isinstance(alpha_function,Function):
+        result = [[target] for (target) in alpha_function.all_high_level_calls() if type(target) == FunctionContract]
+        print(f"all_high_level_calls_1 {result}")
+        return [
+            [[target] for (target) in alpha_function.all_low_level_calls() if type(target) == FunctionContract],
+            [[target] for (target) in alpha_function.all_high_level_calls() if type(target) == FunctionContract],
+            [[target] for (target) in alpha_function.all_internal_calls() if type(target) == FunctionContract],
+            [[target] for (target) in alpha_function.all_library_calls() if type(target) == FunctionContract]
+            ]
+    if isinstance(alpha_function,FunctionContract):
+        result = [[target] for (target) in alpha_function.all_high_level_calls_fc() if type(target) == FunctionContract]
+        print(f"")
+        return [
+            [[target] for (target) in alpha_function.all_low_level_calls_fc() if type(target) == FunctionContract],
+            [[target] for (target) in alpha_function.all_high_level_calls_fc() if type(target) == FunctionContract],
+            [[target] for (target) in alpha_function.all_internal_calls_fc],
+            [[target] for (target) in alpha_function.all_library_calls_fc() if type(target) == FunctionContract]
+        ]
+
+def get_reachable_functions_recursively(contract, function, results, reachable_func, list_of_functions):
+    """
+    From a Slither function object and a function name, generates the complete set of recursive reachable functions.
+    """ 
+    print(f"get_reachable_functions_recursively called contract {contract.name}, function {function.name}, results {results}, reachable_func {reachable_func}, list_of_functions {list_of_functions}")
+    # For each function in the contract
+    for local_function in contract.functions:
+        counter = 0
+        last_match = 0
+        # For each reachable function in the current function
+        for reachable in local_function.reachable_from_functions:
+            counter = counter + 1
+            # Let's check if the current function we are analyzing is reachable 
+            if reachable == function:
+
+                # If it is reachable and not already saved, we save it in reachable_func[function.full_name]
+
+                if function.full_name not in reachable_func:
+
+                    reachable_func[function.full_name] = [local_function.full_name]
+                    
+                    if function.solidity_signature not in list_of_functions:
+                        list_of_functions.append(function.solidity_signature)
+
+                    if local_function.solidity_signature not in list_of_functions:
+                        list_of_functions.append(local_function.solidity_signature)
+                    
+                
+                else:
+                    # if it is reachable and we already have something saved there, we save it in reachable_func[local_function.full_name] as a nested dict
+
+                    reachable_func[function.full_name].append(local_function.full_name)
+                    
+                    if function.solidity_signature not in list_of_functions:
+                        list_of_functions.append(function.solidity_signature)
+                    if local_function.solidity_signature not in list_of_functions:
+                        list_of_functions.append(local_function.solidity_signature)
+                results.append(reachable_func)
+            
+                if function.solidity_signature not in list_of_functions:
+                    list_of_functions.append(function.solidity_signature)
+
+                if local_function.solidity_signature not in list_of_functions:
+                    list_of_functions.append(local_function.solidity_signature)                
+    print(f"utils reachable_func {reachable_func}")
+    list_of_functions = list(set(list_of_functions))
+
+    return results, list_of_functions
+
+
+def get_recursive_calls(alpha_function, results, reachable_func, list_of_functions, reachable_func_str, list_of_functions_str, list_of_str_keys):
+
+    calls = get_all_calls(alpha_function)
+    print(f"calls_GG {calls}")
+    for sublist in calls:
+        
+        for call in sublist:
+            for fc in call:
+                alpha_name = f"{alpha_function.contract}.{alpha_function.solidity_signature}"
+                local_function = f"{fc.contract_declarer}.{fc.solidity_signature}"
+                print(f"REACHING_FUNC:alpha_name {alpha_name} type(fc) {local_function}, fc {fc}")
+            # If it is in reachable_func_str and not already saved, we save it in reachable_func[function.contract + . + solidity_signature]
+                if str(alpha_name) not in list_of_str_keys:
+                    reachable_func[alpha_function] = [fc]
+                    reachable_func_str[alpha_name] = [local_function]
+                    list_of_str_keys.append(alpha_name)
+                    
+                    if str(alpha_name) not in list_of_functions_str:
+                        list_of_functions.append(fc)
+                        list_of_functions_str.append(local_function)
+                    
+                    if local_function not in list_of_functions_str:
+                            list_of_functions.append(fc)
+                            list_of_functions_str.append(local_function)
+                else:
+                    # if it is reachable and we already have something saved there, we save it in reachable_func[local_function.full_name] as a nested dict
+                    print(f"reachable_func_u {reachable_func}, local_function_u {local_function}, alpha_function_u {alpha_function},list_of_functions_u  {list_of_functions}, reachable_func_str_u {reachable_func_str}, list_of_functions_str_u {list_of_functions_str}, alpha_name {alpha_name}")
+
+                    if str(alpha_name) not in list_of_str_keys:
+                        print(f"alpha_name {alpha_name}, list_of_str_keys {list_of_str_keys}, reachable_func.keys() {[x for x in reachable_func.keys()]}")
+                    
+                    reachable_func[alpha_function].append(fc)
+                    reachable_func_str[alpha_name].append(local_function)
+
+                    if alpha_name not in list_of_functions_str:
+                        list_of_functions.append(alpha_function)
+                        list_of_functions_str.append(alpha_name)
+
+                    if local_function not in list_of_functions_str:
+                            list_of_functions.append(fc)
+                            list_of_functions_str.append(local_function)
+            
+            print(f"REACHABLEE {reachable_func_str}")
+            results.append(reachable_func_str)
+            
+            list_of_functions.append(fc)
+            list_of_functions_str.append(local_function)
+            list_of_functions = list(set(list_of_functions))
+            list_of_functions_str = list(set(list_of_functions_str))
+
+
+    return results, reachable_func_str

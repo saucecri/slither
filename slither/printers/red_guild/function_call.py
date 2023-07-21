@@ -1,108 +1,166 @@
-from slither.printers.red_guild.utils import get_reachable_functions_recursively, check_writing_assembly, build_recursive_dict
+from slither.printers.red_guild.utils import get_reachable_functions_recursively, check_writing_assembly, build_json_from_reachable, get_recursive_calls, get_all_calls
 from slither.tools.possible_paths.possible_paths import find_target_paths
-
+from slither.core.declarations import Function
+from slither.core.declarations import Contract, Function, FunctionContract
 
 class FunctionCall:
 
     def __init__(self, slither, contract,  alpha_function):
+        assert alpha_function
+        # Alpha function data
         self.alpha_function = alpha_function.full_name
+        self.alpha_function_visibility = alpha_function.visibility
+
+        # Results and recursive data structures 
         self.results = []
         self.reachable_func = {}
         self.list_of_functions = []
-        self.written_variables = {}
-        self.read_variables = {}
-        self.variables = {}
-        self.all_conditional_state_variables_read = []
-        self.all_conditional_solidity_variables_read = []
-        self.all_high_level_calls = []
-        self.all_library_calls = []
-        self.high_level_calls = {}
-        self.library_calls = {}
-        self.all_state_variables_read = []
-        self.all_state_variables_written = []
-        self.modifiers = []
-        self.internal_calls = []
-        self.external_calls = []
-        self.all_internal_calls = []
-        self.internal_calls_as_signatures = []
-        self.external_calls_as_signatures = []
-        self.library_calls_as_signatures = []
-        self.high_level_calls_as_signatures = []
-        self.all_external_calls = []
+
+        # Store alpha_function variables information
+        self.written_variables = {self.alpha_function: [str(x) for x in alpha_function.state_variables_written  + alpha_function.all_state_variables_written()]}
+        self.read_variables = {self.alpha_function:  [str(x) for x in alpha_function.state_variables_read + alpha_function.solidity_variables_read + alpha_function.all_state_variables_read()]}
+        self.variables = { self.alpha_function:  [x for x in alpha_function.variables]}
+        
+        # Store recursive variable information
+        self.all_conditional_state_variables_read = { self.alpha_function: [x for x in alpha_function.all_conditional_state_variables_read()]}
+        self.all_conditional_solidity_variables_read = { self.alpha_function: [x for x in alpha_function.all_conditional_solidity_variables_read()] }
+        self.all_state_variables_read = { self.alpha_function: [x for x in alpha_function.all_state_variables_read()]}
+        self.all_state_variables_written = { self.alpha_function: [x for x in alpha_function.all_state_variables_written()]}
+
+        # Store alpha_function recursive calls information
+        self.all_high_level_calls = { self.alpha_function: [[contract,target] for (contract,target) in alpha_function.all_high_level_calls()]}
+        self.all_low_level_calls = { self.alpha_function: [[contract,target] for (contract,target) in alpha_function.all_low_level_calls()]}
+        self.all_library_calls = { self.alpha_function: [[contract,target] for (contract,target) in alpha_function.all_library_calls()]}
+        self.all_internal_calls = { self.alpha_function: [[target] for (target) in alpha_function.all_internal_calls()]}
+        self.all_solidity_calls = { self.alpha_function: [[target] for (target) in alpha_function.all_solidity_calls()]}
+
+        """
+        self.results_2 = []
+        self.reachable_func_2 = {}
+        self.list_of_functions_2 = []
+        self.reachable_func_str = {}
+        self.list_of_functions_str = []
+        self.list_of_keys = []
+
+        print(f"alpha_function_2 {type(alpha_function)}")
+
+        lll,pp = get_recursive_calls(alpha_function, self.results_2, self.reachable_func_2, self.list_of_functions_2, self.reachable_func_str, self.list_of_functions_str, self.list_of_keys)
+        
+        print(f"self.results_2 {self.results_2}, self.reachable_func_2 {self.reachable_func_2},self.list_of_functions_2 {self.list_of_functions_2}, lll {lll}. pp {pp}")
+        for function in self.list_of_functions_2:
+            aa, bb = get_recursive_calls(function, self.results_2, self.reachable_func_2, self.list_of_functions_2, self.reachable_func_str, self.list_of_functions_str, self.list_of_keys)
+            print(f"aaaa {aa}, bbbbb {bb}")
+
+        print(f"self.results_3 {self.results_2}, self.reachable_func_3 {self.reachable_func_2},self.list_of_functions_3 {self.list_of_functions_2}, reachable_func_3 {self.reachable_func_str}")
+
+        #print(f"self.reachable_func_2 {self.reachable_func_2}, self.list_of_functions_2 {self.list_of_functions_2}, self.results_2 {self.results_2}")
+        """
+        # Store alpha_function calls information
+        self.solidity_calls = { self.alpha_function: [x for x in alpha_function.solidity_calls]}
+        self.high_level_calls = { self.alpha_function: [[contract,target] for (contract,target) in alpha_function.high_level_calls]}
+        self.low_level_calls = { self.alpha_function: [[contract,target] for (contract,target) in alpha_function.low_level_calls]}
+        self.library_calls =  { self.alpha_function: [[contract,target] for (contract,target) in alpha_function.library_calls]}
+        self.internal_calls = { self.alpha_function: [[target] for (target) in alpha_function.internal_calls]}
+        self.external_calls = { self.alpha_function: [[target] for (target) in alpha_function.solidity_calls]}
+
+
+        # Store alpha_function additional data
+        self.modifiers = { self.alpha_function: [str(x) for x in alpha_function.modifiers]}
+        self.internal_calls_as_signatures = { self.alpha_function: [str(x) for x in alpha_function.internal_calls_as_signatures]}
         self.reading_in_require_or_assert = []
         self.list_of_function_objects = []
-        self.parameters = {}
-        self.results_dict = build_recursive_dict(self.reachable_func)
+        self.parameters = { self.alpha_function: [x for x in alpha_function.parameters]}
+        self.paths_target = find_target_paths(slither, [alpha_function])
 
+        list_reading_in_require_or_assert = []
+        list_reading_in_conditional_nodes = []
+        
+        for variable in alpha_function.variables:
+            if  alpha_function.is_reading_in_require_or_assert(variable):
+                list_reading_in_require_or_assert.append(variable)
+            if alpha_function.is_reading_in_conditional_node(variable):
+                list_reading_in_conditional_nodes.append(variable)
+        
+        self.is_reading_in_require_or_assert = {self.alpha_function: list_reading_in_require_or_assert}
+        self.is_reading_in_conditional_node = {self.alpha_function: list_reading_in_conditional_nodes}
+        
+        # We clean the duplicates and store the clean data
+        self.results_dict = build_json_from_reachable(self.reachable_func)
+        print(f"self.results_dict_1 {self.results_dict}")
         #print(f"results_dict {self.results_dict}")
         get_reachable_functions_recursively(contract, alpha_function, self.results, self.reachable_func, self.list_of_functions)
-
         
+        print(f"self.list_of_functions_1 {self.list_of_functions} self.reachable_func_1 {self.reachable_func}")
+        
+        # We start to look for data on the flow
         for function_name in self.list_of_functions:
             func = contract.get_function_from_signature(function_name)
-            #print(f"dir(func) {dir(func)}")
+            if not func:
+                #print(f"function_name {function_name}, TYPE(function_name) {type(function_name)}")
+                func = next((function for function in contract.functions if function.name == function_name.name), None)
 
-            if type(func) is type(None):
-                print(f"function is None {function_name}")
-                break
+            assert func
 
             get_reachable_functions_recursively(contract, func, self.results, self.reachable_func, self.list_of_functions)
-            self.list_of_functions.append(func)
 
             #print(f"reachable_func {self.reachable_func}")
-            #print(f"func {func}")
+            #print(f"FunctionCall::func {func}")
             #print(f"self.results {self.results}")
             
-            self.written_variables[function_name] = [str(x) for x in func.state_variables_written  + func.all_state_variables_read()]
-
-
-            self.read_variables[function_name] = [str(x) for x in func.state_variables_read + func.solidity_variables_read + func.all_state_variables_read() +  func.variables]
+            self.written_variables[function_name] = [str(x) for x in func.state_variables_written  + func.all_state_variables_written()]
+            self.read_variables[function_name] = [str(x) for x in func.state_variables_read + func.solidity_variables_read + func.all_state_variables_read()]
+            self.variables[function_name] = [x for x in func.variables]
             
-            
-            self.variables[function_name] = [str(x) for x in func.variables]
-            
-            self.parameters[function_name] = [str(x) for x in func.parameters]
+            self.parameters[function_name] = [x for x in func.parameters]
             #self.all_conditional_state_variables_read.append([str(x) for x in func.conditional_state_variable_read])
             
             #self.all_conditional_solidity_variables_read.append([str(x) for x in func.conditional_solidity_variable_read])
             
 
-            self.all_high_level_calls.append([str(x) for x in func.all_high_level_calls()])
+            self.all_high_level_calls[function_name] = [[contract,target] for (contract,target) in func.all_high_level_calls()]
+            self.all_internal_calls[function_name] = [[target] for (target) in func.all_internal_calls()]
+            self.all_library_calls[function_name] = [[contract,target] for (contract,target) in func.all_library_calls()]
+            self.all_low_level_calls[function_name] = [[contract,target] for (contract,target) in func.all_library_calls()]
             
-            self.high_level_calls[function_name] = [str(x) for x in func.high_level_calls]
+            self.high_level_calls[function_name] = [[contract,target] for (contract,target) in func.high_level_calls]
+            self.library_calls[function_name] = [[contract,target] for (contract,target) in func.library_calls]
+            self.low_level_calls[function_name] = [[contract,target] for (contract,target) in func.library_calls]
+            self.internal_calls[function_name] = [[target] for (target) in func.internal_calls]
 
-            self.library_calls[function_name] = [str(x) for x in func.library_calls]
+            self.internal_calls_as_signatures[function_name] = [str(x) for x in func.internal_calls_as_signatures]
+            self.external_calls[function_name] = [str(x) for x in func.external_calls_as_expressions]
 
-            self.all_library_calls.append([str(x) for x in func.all_library_calls()])
-
-
-            self.all_state_variables_read.append([str(x) for x in func.state_variables_read])
-            
-
-            self.all_state_variables_written.append([str(x) for x in func.state_variables_written])
+            #self.all_state_variables_read[function_name] = [str(x) for x in func.state_variables_read]
+            #self.all_state_variables_written[function_name] = [str(x) for x in func.state_variables_written]
             
             #self.variable_written_in_assembly.append([str(x) for x in func.variables_written_in_assembly])
 
-            self.modifiers.append([str(x) for x in func.modifiers])
+            self.modifiers[function_name] = [x for x in func.modifiers]
             
-            self.internal_calls.append([str(x) for x in func.internal_calls])
-
-            #self.all_internal_calls.append([str(x) for x in func.all_internal_calls()])
-
-            #self.all_external_calls.append([str(x) for x in func.all_external_calls()])
-
-            self.internal_calls_as_signatures.append([str(x) for x in func.internal_calls_as_signatures])
-            
-            self.external_calls.append([str(x) for x in func.external_calls_as_expressions])
+            #print(f"type(func) {type(func)}")
+            list_of_read_req = []
+            list_of_read_cond = []
 
             for variable in func.variables:
                 if func.is_reading_in_require_or_assert(variable):
-                    self.reading_in_require_or_assert.append(variable)
-
-            self.paths_target = find_target_paths(slither, [alpha_function])
+                    list_of_read_req.append(variable)
+                if alpha_function.is_reading_in_conditional_node(variable):
+                    list_of_read_cond.append(variable)
             
-            for path in self.paths_target:
-                print(f"path {path}")
-    
-        self.results_dict = build_recursive_dict(self.reachable_func)
+            self.is_reading_in_require_or_assert[function_name] = list_of_read_req
+            self.is_reading_in_conditional_node[function_name] = list_of_read_cond
+
+            # Here we should look for new paths ?
+            #for path in self.paths_target:
+                #print(f"path {path}")
+            #    break
+
+        # We don't need to print this as the correct version is after build_recursive_dict
+        print(f"SECOND self.reachable_func {self.reachable_func}")
+        
+        self.results_dict = build_json_from_reachable(self.reachable_func)
+        #self.results_dict_2 = build_json_from_reachable(self.reachable_func_str)
+        #print(f"DAME_LA_POSTA {self.results_dict_2}")
+
         print(f"self.results_dict {self.results_dict}")
+

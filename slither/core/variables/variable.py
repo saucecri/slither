@@ -174,10 +174,16 @@ class Variable(SourceMapping):
         return name + "(" + ",".join(parameters) + ") returns(" + ",".join(returnVars) + ")"
 
     @property
+    def get_type(self):
+        if self._type:
+            return self._type
+        else:
+            return None
+            
+    @property
     def solidity_signature(self) -> str:
         name, parameters, _ = self.signature
         return f'{name}({",".join(parameters)})'
 
     def __str__(self) -> str:
-        assert self._name
         return self._name

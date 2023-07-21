@@ -152,6 +152,7 @@ class Node(SourceMapping):  # pylint: disable=too-many-public-methods
         self._ssa_vars_read: List["SlithIRVariable"] = []
 
         self._internal_calls: List[Union["Function", "SolidityFunction"]] = []
+        self._internal_calls_as_signatures: List["Function"] = []
         self._solidity_calls: List[SolidityFunction] = []
         self._high_level_calls: List["HighLevelCallType"] = []  # contains library calls
         self._library_calls: List["LibraryCallType"] = []
@@ -402,6 +403,14 @@ class Node(SourceMapping):  # pylint: disable=too-many-public-methods
         - the name of the function (call/delegatecall/codecall)
         """
         return list(self._low_level_calls)
+
+    @property
+    def internal_calls_as_signatures(self) -> List["InternalCallType"]:
+        """
+        list(Function or SolidityFunction): List of internal/
+        solidity function calls
+        """
+        return list(self._internal_calls_as_signatures)
 
     @property
     def external_calls_as_expressions(self) -> List[Expression]:
@@ -883,11 +892,15 @@ class Node(SourceMapping):  # pylint: disable=too-many-public-methods
                     self._vars_written.append(var)
 
             if isinstance(ir, InternalCall):
+                solidity_signature_internal = "" + str(ir.function_name) + "(" + ",".join(str(x.type) for x in ir.arguments) + ")"
+                self._internal_calls_as_signatures.append(solidity_signature_internal)               
                 self._internal_calls.append(ir.function)
+
             if isinstance(ir, SolidityCall):
                 # TODO: consider removing dependancy of solidity_call to internal_call
                 self._solidity_calls.append(ir.function)
                 self._internal_calls.append(ir.function)
+
             if isinstance(ir, LowLevelCall):
                 assert isinstance(ir.destination, (Variable, SolidityVariable))
                 self._low_level_calls.append((ir.destination, str(ir.function_name.value)))
@@ -931,6 +944,8 @@ class Node(SourceMapping):  # pylint: disable=too-many-public-methods
         self._high_level_calls = list(set(self._high_level_calls))
         self._library_calls = list(set(self._library_calls))
         self._low_level_calls = list(set(self._low_level_calls))
+        # Maybe we need to add all types of calls as signatures ?
+        self._internal_calls_as_signatures = list(set(self._internal_calls_as_signatures))
 
     @staticmethod
     def _convert_ssa(v: Variable) -> Optional[Union[StateVariable, LocalVariable]]:

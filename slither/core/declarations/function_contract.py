@@ -114,6 +114,29 @@ class FunctionContract(Function, ContractLevel):
             compute_cyclomatic_complexity(self),
         )
 
+    def get_summary_2(
+        self,
+    ) -> Tuple[str, str, str, List[str], List[str], List[str], List[str], List[str], List[str]]:
+        """
+            Return the function summary
+        Returns:
+            (str, str, str, list(str), list(str), listr(str), list(str), list(str);
+            contract_name, name, visibility, modifiers, vars read, vars written, internal_calls, external_calls_as_expressions
+        """
+        return (
+            self.contract_declarer.name,
+            self.full_name,
+            self.visibility,
+            [str(x) for x in self.modifiers],
+            [str(x) for x in self.state_variables_read + self.solidity_variables_read],
+            [str(x) for x in self.state_variables_written],
+            [str(x) for x in self.internal_calls],
+            [str(x) for x in self.external_calls_as_expressions],
+            [str(x) for x in self.reachable_from_functions],
+            [str(x) for x in self.all_library_calls()],
+            [[contract,target] for (contract,target) in self.all_high_level_calls()]
+        )
+
     # endregion
     ###################################################################################
     ###################################################################################
@@ -135,3 +158,68 @@ class FunctionContract(Function, ContractLevel):
         transform_slithir_vars_to_ssa(self)
         if not self.contract.is_incorrectly_constructed:
             add_ssa_ir(self, all_ssa_state_variables_instances)
+
+    def expressions_vars_written(self):
+        
+        return [str(x) for x in self.expressions_vars_written()]
+    
+    def written_variables(self):
+        return [str(x) for x in filter( None, (self.variables_written, self.state_variables_written, self._expression_vars_written , self._state_vars_written))]
+
+    def read_variables(self):
+        return [str(x) for x in filter( None, (self.variables_read, self.state_variables_read, self.solidity_variables_read, self._state_vars_read , self._all_conditional_solidity_variables_read))]
+    
+    def all_low_level_calls_fc(self):
+        return self.all_low_level_calls()
+
+    def all_high_level_calls_fc(self):
+        result = self.all_high_level_calls()
+        print(f"high_level_fc {result}")
+        return result
+        
+    def all_library_calls_fc(self):
+        return self.all_library_calls()
+        
+    def all_internal_calls_fc(self):
+        return self.all_internal_calls()
+    
+    def all_solidity_calls_fc(self):
+        return self.all_solidity_calls()
+"""
+    def __hash__(self):
+        return hash(str(self.contract_declarer) + self.name)
+
+    def __eq__(self, other):
+        if isinstance(other, FunctionContract):
+            return (self.contract_declarer, self.name) == (other.contract_declarer, other.name)
+        else:
+            return str(self) == str(other)
+
+    def __str__(self):
+        return str(self.contract_declarer) +"."+ self.solidity_signature
+
+ if function.full_name not in reachable_func:
+                    last_match = counter
+                    reachable_func[function.full_name] = [local_function.full_name]
+                    if function.solidity_signature not in list_of_functions:
+                        list_of_functions.append(function.solidity_signature)
+                    if local_function.solidity_signature not in list_of_functions:
+                        list_of_functions.append(local_function.solidity_signature)
+
+                else:
+                    # if it is reachable and we already have something saved there, we save it in reachable_func[local_function.full_name] as a nested dict
+
+                    reachable_func[function.full_name].append(local_function.full_name)
+                    
+                    if function.solidity_signature not in list_of_functions:
+                        list_of_functions.append(function.solidity_signature)
+                    if local_function.solidity_signature not in list_of_functions:
+                        list_of_functions.append(local_function.solidity_signature)
+
+
+                results.append(reachable_func)
+
+    list_of_functions = list(set(list_of_functions))
+
+"""
+            

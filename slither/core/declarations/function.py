@@ -27,7 +27,6 @@ from slither.core.variables.state_variable import StateVariable
 from slither.utils.type import convert_type_for_solidity_signature_to_string
 from slither.utils.utils import unroll
 
-
 # pylint: disable=import-outside-toplevel,too-many-instance-attributes,too-many-statements,too-many-lines
 
 if TYPE_CHECKING:
@@ -149,6 +148,7 @@ class Function(SourceMapping, metaclass=ABCMeta):  # pylint: disable=too-many-pu
         self._solidity_vars_read: List["SolidityVariable"] = []
         self._state_vars_written: List["StateVariable"] = []
         self._internal_calls: List["InternalCallType"] = []
+        self._internal_calls_as_signatures: List["InternalCallType"] = []
         self._solidity_calls: List["SolidityFunction"] = []
         self._low_level_calls: List["LowLevelCallType"] = []
         self._high_level_calls: List["HighLevelCallType"] = []
@@ -224,6 +224,10 @@ class Function(SourceMapping, metaclass=ABCMeta):  # pylint: disable=too-many-pu
 
         # To be improved with a parsing of the documentation
         self.has_documentation: bool = False
+
+        self.list_of_functions = []
+        self.results = []
+        self.reachable_func = {}
 
     ###################################################################################
     ###################################################################################
@@ -818,6 +822,13 @@ class Function(SourceMapping, metaclass=ABCMeta):  # pylint: disable=too-many-pu
         return list(self._internal_calls)
 
     @property
+    def internal_calls_as_signatures(self) -> List["InternalCallType"]:
+        """
+        list(Function or SolidityFunction): List of function calls (that does not create a transaction)
+        """
+        return list(self._internal_calls_as_signatures)
+
+    @property
     def solidity_calls(self) -> List[SolidityFunction]:
         """
         list(SolidityFunction): List of Soldity calls
@@ -1156,6 +1167,11 @@ class Function(SourceMapping, metaclass=ABCMeta):  # pylint: disable=too-many-pu
         if self._all_internals_calls is None:
             self._all_internals_calls = self._explore_functions(lambda x: x.internal_calls)
         return self._all_internals_calls
+
+    def all_internal_calls_as_signatures(self) -> List["InternalCallType"]:
+        if self._all_internals_calls_as_signatures is None:
+            self._all_internals_calls_as_signatures = self._explore_functions(lambda x: x.internal_calls_as_signatures)
+        return self._all_low_level_calls
 
     def all_low_level_calls(self) -> List["LowLevelCallType"]:
         """recursive version of low_level calls"""
@@ -1587,6 +1603,11 @@ class Function(SourceMapping, metaclass=ABCMeta):  # pylint: disable=too-many-pu
         internal_calls = [item for sublist in internal_calls for item in sublist]
         self._internal_calls = list(set(internal_calls))
 
+        internal_calls_as_signatures = [x.internal_calls_as_signatures for x in self.nodes]
+        internal_calls_as_signatures = [x for x in internal_calls_as_signatures if x]
+        internal_calls_as_signatures = [item for sublist in internal_calls_as_signatures for item in sublist]
+        self._internal_calls_as_signatures = list(set(internal_calls_as_signatures))
+
         self._solidity_calls = [c for c in internal_calls if isinstance(c, SolidityFunction)]
 
         low_level_calls = [x.low_level_calls for x in self.nodes]
@@ -1780,4 +1801,49 @@ class Function(SourceMapping, metaclass=ABCMeta):  # pylint: disable=too-many-pu
     def __str__(self) -> str:
         return self.name
 
+"""
+    def __has__(self):
+        return hash(self.canonical_name())
+    
+    def __eq__(self, other):
+        return self.canonical_name == other.canonical_name
+
     # endregion
+
+
+    def get_recursive_calls(self, reachable_func, list_of_functions, results):
+        print(f"alpha_function.get_all_calss() {self.get_all_calls()}")
+        
+        low_level = self.get_low_level_fc()
+        high_level = self.get_high_level_fc()
+        library = self.get_library_fc()
+        internal = self.get_internal_fc()
+        solidity = self.get_solidity_fc()
+        
+        for low_fc, high_fc, internal_fc, library_fc, soldity_fc in low_level, high_level, library, internal, solidity:
+            
+    
+            while low_level and high_level and internal and library:
+                results, reachable_func, list_of_functions, low_level = call_in_list(results, reachable_func, list_of_functions, low_level)
+                
+                results, reachable_func, list_of_functions, high_level = call_in_list(results, reachable_func, list_of_functions, high_level)
+                
+                results, reachable_func, list_of_functions, internal = call_in_list(results, reachable_func, list_of_functions, internal)
+                
+                results, reachable_func, list_of_functions, library = call_in_list(results, reachable_func, list_of_functions, library)
+
+        else:
+            # if it is reachable and we already have something saved there, we save it in reachable_func[local_function.full_name] as a nested dict
+
+            reachable_func[function.full_name].append(local_function.full_name)
+                    
+            if function.solidity_signature not in list_of_functions:
+                        list_of_functions.append(function.solidity_signature)
+            if local_function.solidity_signature not ilist_of_functions:
+                list_of_functions.append(local_function.solidity_signature)
+
+
+        results.append(reachable_func)
+
+    list_of_functions = list(set(list_of_functions))
+"""
