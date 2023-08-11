@@ -159,6 +159,7 @@ class ExpressionToSlithIR(ExpressionVisitor):
         self._expression = expression
         self._node = node
         self._result: List[Operation] = []
+        print(f"expr_in_class {type(self.expression)}, expr_in_class_2 {type(expression)}")
         self._visit_expression(self.expression)
         if node.type == NodeType.RETURN:
             r = Return(get(self.expression))
@@ -284,8 +285,10 @@ class ExpressionToSlithIR(ExpressionVisitor):
     def _post_call_expression(self, expression: CallExpression) -> None:
 
         assert isinstance(expression, CallExpression)
-
         expression_called = expression.called
+        print(f"expression_called {expression_called}, {type(expression_called)}")
+        if isinstance(expression_called, str):
+            return
         called = get(expression_called)
 
         args = [get(a) for a in expression.arguments if a]

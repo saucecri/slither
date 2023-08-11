@@ -1,6 +1,7 @@
 from slither.core.declarations import FunctionContract, Function
 import collections
 import re
+from slither.core.declarations import SolidityFunction
 
 def get_public_functions_writting_var(contract, var):
     funcs_writing = contract.get_functions_writing_to_variable(var)
@@ -183,7 +184,7 @@ def get_all_calls(alpha_function):
         Return the function summary
     Returns:
         (str, str, str, list(str), list(str), listr(str), list(str), list(str);
-        contract_name, name, visibility, modifiers, vars read, vars written, internal_calls, external_calls_as_expressions
+        contract_name, name, visibility, modifiers, vars read, vars written, internal_calls, z
     """
     if isinstance(alpha_function,Function):
         result = [[target] for (target) in alpha_function.all_high_level_calls() if type(target) == FunctionContract]
@@ -204,27 +205,38 @@ def get_all_calls(alpha_function):
             [[target] for (target) in alpha_function.all_library_calls_fc() if type(target) == FunctionContract]
         ]
 
-def get_reachable_functions_recursively(contract, function, results, reachable_func, list_of_functions):
+def get_reachable_functions_recursively(contract, function, results, reachable_func, list_of_functions, list_of_ins_functions):
     """
     From a Slither function object and a function name, generates the complete set of recursive reachable functions.
     """ 
-    print(f"get_reachable_functions_recursively called contract {contract.name}, function {function.name}, results {results}, reachable_func {reachable_func}, list_of_functions {list_of_functions}")
-    # For each function in the contract
-    for local_function in contract.functions:
+    print(f"get_reachable_functions_recursively called contract {contract.name}, function {function.name}, results {results}, reachable_func {reachable_func}, list_of_functions {list_of_functions}, list_of_ins_functions {list_of_ins_functions}")
+    # For each function in the contract and already instantiated functions
+    for local_function in contract.functions +  list_of_ins_functions:
         counter = 0
         last_match = 0
         # For each reachable function in the current function
+        # As SolidityCalls don't have reachable_from_functions we should handle this case
+        if isinstance(local_function,SolidityFunction):
+            continue
         for reachable in local_function.reachable_from_functions:
+            print(f"reachable_in_local_function {reachable.contract_declarer}.{reachable.full_name}, local_function {local_function.contract_declarer}.{local_function.full_name}")
+            reachable_cf = f"{reachable.contract_declarer}.{reachable.full_name}"
+            local_function_cf = f"{local_function.contract_declarer}.{local_function.full_name}"
+            function_cf = f"{function.contract_declarer}.{function.full_name}"
             counter = counter + 1
             # Let's check if the current function we are analyzing is reachable 
-            if reachable == function:
+            if str(reachable.contract_declarer) != "AccountingOracle":
+                print(f"when not AccountingOracle: {function.contract_declarer}.{function.full_name}, reachable {reachable.contract_declarer}.{reachable.full_name}")
+            #if reachable == function:
+            if reachable_cf == function_cf:
+                print(f"reachable by function {reachable.full_name}")
 
                 # If it is reachable and not already saved, we save it in reachable_func[function.full_name]
 
-                if function.full_name not in reachable_func:
-
-                    reachable_func[function.full_name] = [local_function.full_name]
-                    
+                #if function.full_name not in reachable_func:
+                if function_cf not in reachable_func.keys():
+                    #reachable_func[function.full_name] = [local_function.full_name]
+                    reachable_func[function_cf] = [local_function_cf]
                     if function.solidity_signature not in list_of_functions:
                         list_of_functions.append(function.solidity_signature)
 
@@ -235,8 +247,8 @@ def get_reachable_functions_recursively(contract, function, results, reachable_f
                 else:
                     # if it is reachable and we already have something saved there, we save it in reachable_func[local_function.full_name] as a nested dict
 
-                    reachable_func[function.full_name].append(local_function.full_name)
-                    
+                    #reachable_func[function.full_name].append(local_function.full_name)
+                    reachable_func[function_cf].append(local_function_cf)
                     if function.solidity_signature not in list_of_functions:
                         list_of_functions.append(function.solidity_signature)
                     if local_function.solidity_signature not in list_of_functions:
@@ -306,3 +318,21 @@ def get_recursive_calls(alpha_function, results, reachable_func, list_of_functio
 
 
     return results, reachable_func_str
+
+#def set_ext_str_reachable_from_function(function):
+    
+def set_ext_reachable_from_function(origin_function, end_function):
+    print(f"calling_set_ext {origin_function.name}, {end_function.name}")
+    print(f"end_funtion {end_function.nodes} {end_function.all_internal_calls()} {end_function.all_high_level_calls()} {end_function.all_low_level_calls()} {end_function.external_calls_as_expressions} {end_function.all_library_calls()}")
+    for node in end_function.nodes:
+        print(f"node_in_set_ext {node}")
+        for expr in node._expression_calls:
+            print(f"expr_in_set_ext: {expr}")
+            if isinstance(expr.called, str):
+                print(f"is it str?")
+                continue
+            for ir in node.slithir_call_ops_generation(expr):
+                print(f"ir_in_ops {str(ir)}, {origin_function.contract_declarer}.{origin_function.full_name}, end_ {end_function.contract_declarer}.{end_function.full_name}")
+                origin_function.add_reachable_from_node(node, ir)
+                for f in origin_function.reachable_from_functions:
+                    print(f"is_in ? {f.contract_declarer}.{f.full_name}")

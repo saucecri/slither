@@ -96,7 +96,8 @@ def convert_expression(expression: Expression, node: "Node") -> List[Operation]:
     # handle standlone expression
     # such as return true;
     from slither.core.cfg.node import NodeType
-
+    if isinstance(expression, str):
+        return
     if isinstance(expression, Literal) and node.type in [NodeType.IF, NodeType.IFLOOP]:
         cst = Constant(expression.value, expression.type)
         cond = Condition(cst)
@@ -111,7 +112,7 @@ def convert_expression(expression: Expression, node: "Node") -> List[Operation]:
         cond.set_expression(expression)
         cond.set_node(node)
         return [cond]
-
+    print(f"convert_expression {type(expression)}")
     visitor = ExpressionToSlithIR(expression, node)
     result = visitor.result()
 

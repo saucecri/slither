@@ -1,6 +1,7 @@
 from typing import Any, Optional, List
 
 from slither.core.expressions.expression import Expression
+import re
 
 
 class CallExpression(Expression):  # pylint: disable=too-many-instance-attributes
@@ -16,6 +17,7 @@ class CallExpression(Expression):  # pylint: disable=too-many-instance-attribute
         self._gas: Optional[Expression] = None
         self._value: Optional[Expression] = None
         self._salt: Optional[Expression] = None
+        
 
     @property
     def call_value(self) -> Optional[Expression]:
@@ -63,3 +65,15 @@ class CallExpression(Expression):  # pylint: disable=too-many-instance-attribute
                 options = [gas, value, salt]
                 txt += "{" + ",".join([o for o in options if o != ""]) + "}"
         return txt + "(" + ",".join([str(a) for a in self._arguments]) + ")"
+    
+    def get_contract_and_func_from_expr(self):
+        call = str(self._called)
+        if call[0] == "I":
+            call = call.lstrip("I")
+        match = re.search(r"([\w]+)\((.*)\)\.([\w]+)", call)
+        if match:
+            class_name = match.group(1)
+            method_name = match.group(3)
+            return class_name, method_name
+        else:
+            raise Exception

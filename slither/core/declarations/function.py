@@ -224,7 +224,7 @@ class Function(SourceMapping, metaclass=ABCMeta):  # pylint: disable=too-many-pu
 
         # To be improved with a parsing of the documentation
         self.has_documentation: bool = False
-
+        self.calls_as_ops = []
         self.list_of_functions = []
         self.results = []
         self.reachable_func = {}
@@ -1072,7 +1072,12 @@ class Function(SourceMapping, metaclass=ABCMeta):  # pylint: disable=too-many-pu
 
     def add_reachable_from_node(self, n: "Node", ir: "Operation") -> None:
         self._reachable_from_nodes.add(ReacheableNode(n, ir))
+        print(f"adding to reachable_from_functions {n.function}, {self.contract.name}, ir: {str(ir)}")
         self._reachable_from_functions.add(n.function)
+
+   # def add_reachable_from_node(self, n: "Node", ir: "Operation") -> None:
+   #     self._reachable_from_nodes.add(ReacheableNode(n, ir))
+   #     self._reachable_from_functions.add(n.function)
 
     # endregion
     ###################################################################################
@@ -1172,7 +1177,7 @@ class Function(SourceMapping, metaclass=ABCMeta):  # pylint: disable=too-many-pu
         if self._all_internals_calls_as_signatures is None:
             self._all_internals_calls_as_signatures = self._explore_functions(lambda x: x.internal_calls_as_signatures)
         return self._all_low_level_calls
-
+    
     def all_low_level_calls(self) -> List["LowLevelCallType"]:
         """recursive version of low_level calls"""
         if self._all_low_level_calls is None:
@@ -1801,49 +1806,29 @@ class Function(SourceMapping, metaclass=ABCMeta):  # pylint: disable=too-many-pu
     def __str__(self) -> str:
         return self.name
 
-"""
-    def __has__(self):
-        return hash(self.canonical_name())
-    
-    def __eq__(self, other):
-        return self.canonical_name == other.canonical_name
-
-    # endregion
-
-
-    def get_recursive_calls(self, reachable_func, list_of_functions, results):
-        print(f"alpha_function.get_all_calss() {self.get_all_calls()}")
-        
-        low_level = self.get_low_level_fc()
-        high_level = self.get_high_level_fc()
-        library = self.get_library_fc()
-        internal = self.get_internal_fc()
-        solidity = self.get_solidity_fc()
-        
-        for low_fc, high_fc, internal_fc, library_fc, soldity_fc in low_level, high_level, library, internal, solidity:
-            
-    
-            while low_level and high_level and internal and library:
-                results, reachable_func, list_of_functions, low_level = call_in_list(results, reachable_func, list_of_functions, low_level)
+    def get_call_ops(self):
+        for node in self.nodes:
+            for expr in node.external_calls_as_expressions:
+                #print(f"expr_gg {expr}, {type(expr)} expr_gg.called {expr.called}, {type(expr.called)}")
+                if isinstance(expr.called, str):
+                    #print(f"expr_is_str {expr}")
+                    expr_contract, expr_function = expr.get_contract_and_func_from_expr()
+                    #print(f"expr.expr_contract_name {expr_contract}, expr.expr_function_name {expr_function}")
+                    if (expr_contract,expr_function) not in self.call_as_str:
+                        self.call_as_str.append((expr_contract, expr_function))
+                        #for node_in_str in expr_function.nodes:
+                            #for expr_in_str in node_str.external_calls_as_expressions:
+                                #for ir in node_in_str.slithir_call_ops_generation(expr_in_str):
+                                    #if ir_in_str not in self.call_as_ops and ir.function not in self.reachable_from_functions:
+                                        #self.add_reachable_from_node(node_in_str, ir_in_str)
+                       #for ir in node.slithir_call_ops_generation(expr):
+                            #self.add_reachable_from_node(node, ir)
+                    continue
                 
-                results, reachable_func, list_of_functions, high_level = call_in_list(results, reachable_func, list_of_functions, high_level)
-                
-                results, reachable_func, list_of_functions, internal = call_in_list(results, reachable_func, list_of_functions, internal)
-                
-                results, reachable_func, list_of_functions, library = call_in_list(results, reachable_func, list_of_functions, library)
+                for ir in node.slithir_call_ops_generation(expr):
+                    if ir not in self.call_as_ops and ir.function not in self.reachable_from_functions:
+                        self.call_as_ops.append(ir)
+                        #self.add_reachable_from_node(node, ir)
 
-        else:
-            # if it is reachable and we already have something saved there, we save it in reachable_func[local_function.full_name] as a nested dict
-
-            reachable_func[function.full_name].append(local_function.full_name)
-                    
-            if function.solidity_signature not in list_of_functions:
-                        list_of_functions.append(function.solidity_signature)
-            if local_function.solidity_signature not ilist_of_functions:
-                list_of_functions.append(local_function.solidity_signature)
-
-
-        results.append(reachable_func)
-
-    list_of_functions = list(set(list_of_functions))
-"""
+        print(f"self.call_as_ops {self.call_as_ops}")
+        return self.call_as_ops

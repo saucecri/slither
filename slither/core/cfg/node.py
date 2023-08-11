@@ -715,6 +715,28 @@ class Node(SourceMapping):  # pylint: disable=too-many-public-methods
             self._irs = convert_expression(expression, self)  # type:ignore
 
         self._find_read_write_call()
+    
+    def slithir_call_ops_generation(self, expression) -> List[Operation]:
+        calls = []
+        if isinstance(expression, str):
+            print(f"node_generation_is_str {expression}")
+
+        _irs = convert_expression(expression, self)
+        if _irs:
+            for ir in _irs:
+                if isinstance(ir,HighLevelCall):
+                    calls.append(ir)
+                if isinstance(ir,InternalCall):
+                    calls.append(ir)
+                if isinstance(ir,LibraryCall):
+                    calls.append(ir)
+                if isinstance(ir,LowLevelCall):
+                    calls.append(ir)
+                # SolidityCall does not have a lot of elements tht the other ones have, so initially we won't support those
+                #if isinstance(ir,SolidityCall):
+                #    calls.append(ir)
+        print(f"calls_in_node_ops {calls}")
+        return calls
 
     def all_slithir_operations(self) -> List[Operation]:
         if self._all_slithir_operations is None:

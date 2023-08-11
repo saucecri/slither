@@ -21,6 +21,13 @@ class FunctionContract(Function, ContractLevel):
     def __init__(self, compilation_unit: "SlitherCompilationUnit") -> None:
         super().__init__(compilation_unit)
         self._contract_declarer: Optional["Contract"] = None
+        self.call_as_ops = []
+        self.call_as_str = []
+        for node in self.nodes:
+            for expr in node.calls_as_expression:
+
+                self.calls_as_ops = node.slithir_call_ops_generation(expr)
+
 
     def set_contract_declarer(self, contract: "Contract") -> None:
         self._contract_declarer = contract
@@ -185,41 +192,7 @@ class FunctionContract(Function, ContractLevel):
     
     def all_solidity_calls_fc(self):
         return self.all_solidity_calls()
-"""
-    def __hash__(self):
-        return hash(str(self.contract_declarer) + self.name)
 
-    def __eq__(self, other):
-        if isinstance(other, FunctionContract):
-            return (self.contract_declarer, self.name) == (other.contract_declarer, other.name)
-        else:
-            return str(self) == str(other)
-
-    def __str__(self):
-        return str(self.contract_declarer) +"."+ self.solidity_signature
-
- if function.full_name not in reachable_func:
-                    last_match = counter
-                    reachable_func[function.full_name] = [local_function.full_name]
-                    if function.solidity_signature not in list_of_functions:
-                        list_of_functions.append(function.solidity_signature)
-                    if local_function.solidity_signature not in list_of_functions:
-                        list_of_functions.append(local_function.solidity_signature)
-
-                else:
-                    # if it is reachable and we already have something saved there, we save it in reachable_func[local_function.full_name] as a nested dict
-
-                    reachable_func[function.full_name].append(local_function.full_name)
-                    
-                    if function.solidity_signature not in list_of_functions:
-                        list_of_functions.append(function.solidity_signature)
-                    if local_function.solidity_signature not in list_of_functions:
-                        list_of_functions.append(local_function.solidity_signature)
-
-
-                results.append(reachable_func)
-
-    list_of_functions = list(set(list_of_functions))
-
-"""
-            
+    def get_call_as_ops(self):
+        super().get_call_ops()
+        return self.call_as_ops

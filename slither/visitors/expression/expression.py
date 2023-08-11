@@ -27,6 +27,7 @@ class ExpressionVisitor:
         super().__init__()
         # Inherited class must declare their variables prior calling super().__init__
         self._expression = expression
+        print(f"expression_in_visit_1 {type(self._expression)}, {type(expression)}, , {expression}")
         self._visit_expression(self.expression)
 
     @property
@@ -37,6 +38,9 @@ class ExpressionVisitor:
     # call pre_visit, visit_expression_name, post_visit
     # pylint: disable=too-many-branches
     def _visit_expression(self, expression: Expression) -> None:
+        if isinstance(expression,str):
+            print(f"expression_in_visit {expression}")
+            return
         self._pre_visit(expression)
 
         if isinstance(expression, AssignmentOperation):
@@ -88,7 +92,7 @@ class ExpressionVisitor:
             pass
 
         else:
-            raise SlitherError(f"Expression not handled: {expression}")
+            raise SlitherError(f"Expression not handled: {expression}, {type(expression)}")
 
         self._post_visit(expression)
 
@@ -207,9 +211,9 @@ class ExpressionVisitor:
 
         elif expression is None:
             pass
-
+        
         else:
-            raise SlitherError(f"Expression not handled: {expression}")
+            raise SlitherError(f"Expression not handled: {expression}, {type(expression)}")
 
     # pre_expression_name
 
@@ -312,8 +316,8 @@ class ExpressionVisitor:
             pass
 
         else:
-            raise SlitherError(f"Expression not handled: {expression}")
-
+            raise SlitherError(f"Expression not handled: {expression}, {type(expression)}")
+    
     # post_expression_name
 
     def _post_assignement_operation(self, expression: AssignmentOperation) -> None:

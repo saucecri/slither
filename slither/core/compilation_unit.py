@@ -22,7 +22,7 @@ from slither.core.scope.scope import FileScope
 from slither.core.solidity_types.type_alias import TypeAliasTopLevel
 from slither.core.variables.state_variable import StateVariable
 from slither.core.variables.top_level_variable import TopLevelVariable
-from slither.slithir.operations import InternalCall
+from slither.slithir.operations import InternalCall, HighLevelCall, LowLevelCall, LibraryCall
 from slither.slithir.variables import Constant
 
 if TYPE_CHECKING:
@@ -170,8 +170,21 @@ class SlitherCompilationUnit(Context):
             for node in f.nodes:
                 for ir in node.irs_ssa:
                     if isinstance(ir, InternalCall):
-                        assert ir.function
+                        assert isinstance(ir.function,Function)
                         ir.function.add_reachable_from_node(node, ir)
+                    """    
+                    if isinstance(ir, HighLevelCall):
+                        assert isinstance(ir.function,Function)
+                        ir.function.add_reachable_from_node(node, ir)
+                    if isinstance(ir, LibraryCall):
+                        assert isinstance(ir.function,Function)
+                        ir.function.add_reachable_from_node(node, ir)
+                    if isinstance(ir, LowLevelCall):
+                        assert isinstance(ir.function,Function)
+                        ir.function.add_reachable_from_node(node, ir)
+                    if isinstance(ir, str):
+                        continue                                
+                    """
 
     # endregion
     ###################################################################################

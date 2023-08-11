@@ -21,212 +21,7 @@ import json
 import networkx as nx
 import pandas as pd
 import matplotlib.pyplot as plt
-
-def _contract_subgraph(contract):
-    return f"cluster_{contract.id}_{contract.name}"
-
-
-# return unique id for contract function to use as node name
-def _function_node(contract, function):
-    return f"{contract.id}_{function.name}"
-
-
-# return unique id for solidity function to use as node name
-def _solidity_function_node(solidity_function):
-    return f"{solidity_function.name}"
-
-
-# return dot language string to add graph edge
-def _edge(from_node, to_node):
-    return f'"{from_node}" -> "{to_node}"'
-
-
-# return dot language string to add graph node (with optional label)
-def _node(node, label=None):
-    return " ".join(
-        (
-            f'"{node}"',
-            f'[label="{label}"]' if label is not None else "",
-        )
-    )
-
-
-# pylint: disable=too-many-arguments
-def _process_internal_call(
-    contract,
-    function,
-    internal_call,
-    contract_calls,
-    solidity_functions,
-    solidity_calls,
-):
-    if isinstance(internal_call, (Function)):
-        contract_calls[contract].add(
-            _edge(
-                _function_node(contract, function),
-                _function_node(contract, internal_call),
-            )
-        )
-    elif isinstance(internal_call, (SolidityFunction)):
-        solidity_functions.add(
-            _node(_solidity_function_node(internal_call)),
-        )
-        solidity_calls.add(
-            _edge(
-                _function_node(contract, function),
-                _solidity_function_node(internal_call),
-            )
-        )
-
-
-def _render_external_calls(external_calls):
-    return "\n".join(external_calls)
-
-
-def _render_internal_calls(contract, contract_functions, contract_calls):
-    lines = []
-
-    lines.append(f"subgraph {_contract_subgraph(contract)} {{")
-    lines.append(f'label = "{contract.name}"')
-
-    lines.extend(contract_functions[contract])
-    lines.extend(contract_calls[contract])
-
-    lines.append("}")
-
-    return "\n".join(lines)
-
-
-def _render_solidity_calls(solidity_functions, solidity_calls):
-    lines = []
-
-    lines.append("subgraph cluster_solidity {")
-    lines.append('label = "[Solidity]"')
-
-    lines.extend(solidity_functions)
-    lines.extend(solidity_calls)
-
-    lines.append("}")
-
-    return "\n".join(lines)
-
-
-def _process_external_call(
-    contract,
-    function,
-    external_call,
-    contract_functions,
-    external_calls,
-    all_contracts,
-):
-    external_contract, external_function = external_call
-
-    if not external_contract in all_contracts:
-        return
-
-    # add variable as node to respective contract
-    if isinstance(external_function, (Variable)):
-        contract_functions[external_contract].add(
-            _node(
-                _function_node(external_contract, external_function),
-                external_function.name,
-            )
-        )
-
-    external_calls.add(
-        _edge(
-            _function_node(contract, function),
-            _function_node(external_contract, external_function),
-        )
-    )
-
-
-# pylint: disable=too-many-arguments
-def _process_function(
-    contract,
-    function,
-    contract_functions,
-    contract_calls,
-    solidity_functions,
-    solidity_calls,
-    external_calls,
-    all_contracts,
-):
-    contract_functions[contract].add(
-        _node(_function_node(contract, function), function.name),
-    )
-
-    for internal_call in function.internal_calls:
-        _process_internal_call(
-            contract,
-            function,
-            internal_call,
-            contract_calls,
-            solidity_functions,
-            solidity_calls,
-        )
-    for external_call in function.high_level_calls:
-        _process_external_call(
-            contract,
-            function,
-            external_call,
-            contract_functions,
-            external_calls,
-            all_contracts,
-        )
-
-
-def _process_functions(functions):
-    contract_functions = defaultdict(set)  # contract -> contract functions nodes
-    contract_calls = defaultdict(set)  # contract -> contract calls edges
-
-    solidity_functions = set()  # solidity function nodes
-    solidity_calls = set()  # solidity calls edges
-    external_calls = set()  # external calls edges
-
-    all_contracts = set()
-
-    for function in functions:
-        all_contracts.add(function.contract_declarer)
-    for function in functions:
-        _process_function(
-            function.contract_declarer,
-            function,
-            contract_functions,
-            contract_calls,
-            solidity_functions,
-            solidity_calls,
-            external_calls,
-            all_contracts,
-        )
-
-    render_internal_calls = ""
-    for contract in all_contracts:
-        render_internal_calls += _render_internal_calls(
-            contract, contract_functions, contract_calls
-        )
-
-    render_solidity_calls = _render_solidity_calls(solidity_functions, solidity_calls)
-
-    render_external_calls = _render_external_calls(external_calls)
-    
-    return render_internal_calls + render_solidity_calls + render_external_calls
-
-class ResultContract():
-
-    def __init__(self, name='', visi='', read_vars=[], written_vars=[], internal_calls=[], external_calls=[], flow=[]):
-        pass
-
-class ResultFunction():
-
-    def __init__(self, name=[], visi=[], read_vars=[], written_vars=[], internal_calls=[], external_calls=[], flow=[]):
-        self.name = []
-        self.visi = []
-        self.read_vars = []
-        self.written_vars = []
-        self.internal_calls = []
-        self.external_calls = []
-
+#from pycrunch_trace.client.api import Trace
 
 class FunctionCallGraph(AbstractPrinter):
     ARGUMENT = "function-call-graph"
@@ -240,17 +35,19 @@ class FunctionCallGraph(AbstractPrinter):
         Args:
             filename(string)
         """
+        #tracer = Trace()
+        #tracer.start('funct_call_graph')
+
         res = []
         txt = ''
         list_dicts = {}
         results = []
 
-        nt = Network('1920px', '50%', select_menu=True, filter_menu=True)
+        nt = Network('1920px', '50%', select_menu=True, filter_menu=True,cdn_resources="remote")
 
         for contract in self.contracts:
             if contract.name == "AccountingOracle":
                 (_, _, _, func_summaries, _) = contract.get_summary_2()
-
 
                 # primero analizamos todas las funciones y creamos los flows, luego los preguntamos y ya
                 for (
@@ -293,7 +90,7 @@ class FunctionCallGraph(AbstractPrinter):
 
                         if f_name:
                             # si las funciones que llaman son internas, entonces vamos a buscar todas las variables leidas y escritas. tambien necesitamos las funciones internas y externas para seguir yendo hasta el final
-                            #print(f"f_name {f_name}, {type(f_name)}")
+                            print(f"f_name {f_name}, {type(f_name)}")
                             
                             alpha_function = contract.get_function_from_signature(f_name)
                             if not alpha_function:
@@ -504,15 +301,16 @@ class FunctionCallGraph(AbstractPrinter):
             print(f"list_of_reading_in_require {set(list_of_reading_in_require)}")
             print(f"list_of_reading_in_cond {set(list_of_reading_in_cond)}")
             
-            if result.alpha_function_visibility == 'public' or result.alpha_function_visibility == 'external':
+            # Este if esta mal, solo scaneo las public o external pero deberia escanear todo porque sino no abro bien el tree TODO: Fix this 
+            #if result.alpha_function_visibility == 'public' or result.alpha_function_visibility == 'external':
 
-                if not result.results_dict:
-                    continue
+            if not result.results_dict:
+                continue
             
-                j = json.loads(str(result.results_dict).replace("\'", "\""))
-                G = add_multidigraph_function_data(j, G)
-                print(f"result.results_dict: {result.results_dict}")
-            
+            j = json.loads(str(result.results_dict).replace("\'", "\""))
+            G = add_multidigraph_function_data(j, G)
+            print(f"result.results_dict: {result.results_dict}")
+        
         
         #print(f"G: {G}")
         num_layers = max(nx.get_node_attributes(G, 'layer').values()) + 1
@@ -580,7 +378,7 @@ const options = {
   }
 }""")
         nt.show("function_call.html")        
-
+        #tracer.stop()
         return self.generate_output(res)
 
 def add_multidigraph_function_data(data, G):
